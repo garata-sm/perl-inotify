@@ -56,6 +56,10 @@ sub new {
     $self->{my_event_handle} = undef;
     $self->{my_event_handle} = $conf->{my_event_handle} if defined $conf->{my_event_handle};
 
+    # User defined subroutine to run on Linux::Inotify2 base constructor instance time.
+    $self->{grep_masks_sub} = undef;
+    $self->{grep_masks_sub} = $conf->{greb_masks_sub} if defined $conf->{grep_masks_sub};
+
     # Initialize vars.
     $self->{cookies_to_rm} = {};
 
@@ -107,7 +111,7 @@ sub inotify_watch {
     $! = undef;
     my $watcher = $self->watch(
         $dir,
-        ( IN_MODIFY | IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVED_FROM | IN_CREATE | IN_DELETE | IN_IGNORED | IN_UNMOUNT | IN_DELETE_SELF ),
+        $self->watch_these( $dir ),
         $self->{watcher_sub}
     );
 
@@ -119,6 +123,20 @@ sub inotify_watch {
     }
     $self->dump_watched('added/moved') if ( $self->{ver} >= 9 || ( $self->{ver} >= 8 && !$initial_run ));
     return $watcher;
+}
+
+
+sub watch_these {
+    my ( $self, $dir ) = @_;
+
+    my $default = ( IN_MODIFY | IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVED_FROM | IN_CREATE | IN_DELETE | IN_IGNORED | IN_UNMOUNT | IN_DELETE_SELF );
+
+    return $default unless -d $dir;
+
+    if ( defined $self->{grep_masks_sub} ) {
+        return $self->{grep_masks_sub}->( $dir );
+    }
+    return $default;
 }
 
 
